@@ -245,7 +245,11 @@ public class PackageProject : BuildCommand
             if (ProjectDirectory != null)
             {
                 BuildCommands.BuildSolution.RunRestore(NativeAotEntryProject.FullName, BuildUserSolutionArguments);
-                BuildCommands.BuildSolution.RunBuild(ProjectDirectory, buildConfig, publish: true, BuildUserSolutionArguments);
+                List<string> PublishArguments = new(BuildUserSolutionArguments)
+                {
+                    "--no-restore"
+                };
+                BuildCommands.BuildSolution.RunBuild(ProjectDirectory, buildConfig, publish: true, PublishArguments);
             }
         }
         finally
