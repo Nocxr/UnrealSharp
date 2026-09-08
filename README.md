@@ -90,19 +90,21 @@ public:
 IMPLEMENT_PRIMARY_GAME_MODULE(FMyGameModule, MyGame, "MyGame");
 ```
 
-Mark the managed runtime project that begins with `Managed` as the NativeAOT entry point:
-
-```xml
-<PropertyGroup>
-  <UnrealSharpNativeAotEntryPoint>true</UnrealSharpNativeAotEntryPoint>
-</PropertyGroup>
-```
+The NativeAOT build automatically selects the runtime project whose name begins with `Managed`; no additional property is required in its `.csproj`.
 
 Compile and save managed-derived Blueprints and save their maps before cooking. Blueprint assets saved against an older managed class layout may otherwise retain stale component-template references.
 
 ### Packaging
 
-Close Unreal Editor before command-line packaging. Set the local paths for the project, engine, Android SDK, NDK, and JDK:
+The normal workflow is **UnrealSharp > Package > Package for Android/Quest** in the editor. The command opens a packaging console and runs these stages in order:
+
+1. Generate and compile Android Game bindings.
+2. Publish the managed game and UnrealSharp runtime graph with .NET 11 Android ARM64 NativeAOT.
+3. Run Unreal's Android ASTC build, cook, stage, and package pipeline.
+
+The process stops on the first failed stage and leaves the console open so its result can be inspected. Save all Blueprints and maps before running it.
+
+The commands below are the manual equivalent for diagnostics or automation. Close Unreal Editor before using them directly. Set the local paths for the project, engine, Android SDK, NDK, and JDK:
 
 ```powershell
 $Project = "H:\projects\unreal\MyGame"
@@ -113,6 +115,23 @@ $env:ANDROID_SDK_ROOT = $env:ANDROID_HOME
 $env:NDKROOT = "C:\Android\sdk\ndk\27.2.12479018"
 $env:NDK_ROOT = $env:NDKROOT
 $env:JAVA_HOME = "C:\Android\jdk-21.0.3"
+```
+
+Generate the Android Game bindings first:
+
+```powershell
+& "$Engine\Engine\Build\BatchFiles\RunUAT.bat" `
+  "-ScriptsForProject=$Project\MyGame.uproject" `
+  BuildCookRun `
+  "-Project=$Project\MyGame.uproject" `
+  -noP4 `
+  -platform=Android `
+  -clientconfig=Development `
+  -build `
+  -skipcook `
+  -skipstage `
+  -skippackage `
+  -utf8output
 ```
 
 First publish the managed game and UnrealSharp runtime graph as Android ARM64 NativeAOT. Replace `MyGame.uproject` with the actual project filename:
