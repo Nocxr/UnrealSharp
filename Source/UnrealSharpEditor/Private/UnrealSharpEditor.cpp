@@ -144,13 +144,25 @@ void FUnrealSharpEditorModule::OnPackageAndroidQuest()
 	const FString ScriptPath = FPaths::ConvertRelativePathToFull(Plugin->GetBaseDir() / TEXT("Build/PackageAndroidQuest.ps1"));
 	const FString ProjectPath = FPaths::ConvertRelativePathToFull(FPaths::GetProjectFilePath());
 	const FString EnginePath = FPaths::ConvertRelativePathToFull(FPaths::EngineDir() / TEXT(".."));
-	const FString Arguments = FString::Printf(
-		TEXT("-NoProfile -ExecutionPolicy Bypass -File \"%s\" -Project \"%s\" -Engine \"%s\""),
-		*ScriptPath, *ProjectPath, *EnginePath);
+	if (!FPaths::FileExists(ScriptPath))
+	{
+		UE_LOGFMT(LogUnrealSharpEditor, Error, "Android/Quest packaging script was not found: {0}", ScriptPath);
+		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("AndroidQuestScriptMissing", "The Android/Quest packaging script could not be found. See the Output Log for its expected location."));
+		return;
+	}
 
-	FProcHandle ProcessHandle = FPlatformProcess::CreateProc(TEXT("powershell.exe"), *Arguments, true, false, false, nullptr, 0, *FPaths::ProjectDir(), nullptr);
+	const FString SystemRoot = FPlatformMisc::GetEnvironmentVariable(TEXT("SystemRoot"));
+	const FString PowerShellPath = FPaths::Combine(SystemRoot, TEXT("System32/WindowsPowerShell/v1.0/powershell.exe"));
+	const FString CmdPath = FPaths::Combine(SystemRoot, TEXT("System32/cmd.exe"));
+	const FString Arguments = FString::Printf(
+		TEXT("/c start \"UnrealSharp Android Quest Package\" \"%s\" -NoExit -NoProfile -ExecutionPolicy Bypass -File \"%s\" -Project \"%s\" -Engine \"%s\""),
+		*PowerShellPath, *ScriptPath, *ProjectPath, *EnginePath);
+
+	UE_LOGFMT(LogUnrealSharpEditor, Display, "Launching Android/Quest packaging in a new PowerShell window. Script: {0}", ScriptPath);
+	FProcHandle ProcessHandle = FPlatformProcess::CreateProc(*CmdPath, *Arguments, true, true, true, nullptr, 0, *FPaths::ProjectDir(), nullptr);
 	if (!ProcessHandle.IsValid())
 	{
+		UE_LOGFMT(LogUnrealSharpEditor, Error, "Failed to launch Android/Quest packaging through: {0}", CmdPath);
 		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("AndroidQuestLaunchFailed", "Failed to start the Android/Quest packaging process."));
 	}
 }
