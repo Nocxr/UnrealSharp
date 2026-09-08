@@ -11,6 +11,13 @@ $projectFile = (Resolve-Path -LiteralPath $Project).Path
 $projectRoot = Split-Path -Parent $projectFile
 $projectName = [IO.Path]::GetFileNameWithoutExtension($projectFile)
 $runUat = Join-Path $Engine 'Engine\Build\BatchFiles\RunUAT.bat'
+$logDirectory = Join-Path $projectRoot 'Saved\Logs'
+$logFile = Join-Path $logDirectory 'UnrealSharp-AndroidQuest-Package.log'
+
+New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+Start-Transcript -Path $logFile -Force
+
+try {
 
 if (-not (Test-Path -LiteralPath $runUat)) {
     throw "RunUAT.bat was not found under '$Engine'."
@@ -75,4 +82,14 @@ Invoke-UAT @(
 )
 
 Write-Host "Packaging complete: $projectRoot\Binaries\Android" -ForegroundColor Green
-Read-Host 'Press Enter to close'
+}
+catch {
+    Write-Host ''
+    Write-Host 'Android/Quest packaging failed:' -ForegroundColor Red
+    Write-Host $_ -ForegroundColor Red
+    Write-Host "Full log: $logFile" -ForegroundColor Yellow
+}
+finally {
+    Stop-Transcript
+    Read-Host 'Press Enter to close'
+}

@@ -151,20 +151,21 @@ void FUnrealSharpEditorModule::OnPackageAndroidQuest()
 		return;
 	}
 
-	const FString SystemRoot = FPlatformMisc::GetEnvironmentVariable(TEXT("SystemRoot"));
-	const FString PowerShellPath = FPaths::Combine(SystemRoot, TEXT("System32/WindowsPowerShell/v1.0/powershell.exe"));
-	const FString CmdPath = FPaths::Combine(SystemRoot, TEXT("System32/cmd.exe"));
+	#if PLATFORM_WINDOWS
+	const FString PowerShellPath = FPaths::Combine(FPlatformMisc::GetEnvironmentVariable(TEXT("SystemRoot")), TEXT("System32/WindowsPowerShell/v1.0/powershell.exe"));
 	const FString Arguments = FString::Printf(
-		TEXT("/c start \"UnrealSharp Android Quest Package\" \"%s\" -NoExit -NoProfile -ExecutionPolicy Bypass -File \"%s\" -Project \"%s\" -Engine \"%s\""),
-		*PowerShellPath, *ScriptPath, *ProjectPath, *EnginePath);
+		TEXT("-NoExit -NoProfile -ExecutionPolicy Bypass -File \"%s\" -Project \"%s\" -Engine \"%s\""),
+		*ScriptPath, *ProjectPath, *EnginePath);
 
 	UE_LOGFMT(LogUnrealSharpEditor, Display, "Launching Android/Quest packaging in a new PowerShell window. Script: {0}", ScriptPath);
-	FProcHandle ProcessHandle = FPlatformProcess::CreateProc(*CmdPath, *Arguments, false, false, false, nullptr, 0, *FPaths::ProjectDir(), nullptr);
-	if (!ProcessHandle.IsValid())
+	if (!FPlatformProcess::LaunchFileInDefaultExternalApplication(*PowerShellPath, *Arguments, ELaunchVerb::Open, false))
 	{
-		UE_LOGFMT(LogUnrealSharpEditor, Error, "Failed to launch Android/Quest packaging through: {0}", CmdPath);
+		UE_LOGFMT(LogUnrealSharpEditor, Error, "Failed to launch Android/Quest packaging through: {0}", PowerShellPath);
 		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("AndroidQuestLaunchFailed", "Failed to start the Android/Quest packaging process."));
 	}
+	#else
+	FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("AndroidQuestWindowsOnly", "Android/Quest packaging from the UnrealSharp menu is currently supported on Windows."));
+	#endif
 }
 
 void FUnrealSharpEditorModule::OnMergeManagedSlnAndNativeSln()
