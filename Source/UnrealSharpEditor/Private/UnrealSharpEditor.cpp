@@ -132,6 +132,29 @@ void FUnrealSharpEditorModule::OnPackageProject()
 	PackageProject();
 }
 
+void FUnrealSharpEditorModule::OnPackageAndroidQuest()
+{
+	const TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(UE_PLUGIN_NAME);
+	if (!Plugin.IsValid())
+	{
+		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("AndroidQuestPluginMissing", "Unable to locate the UnrealSharp plugin directory."));
+		return;
+	}
+
+	const FString ScriptPath = FPaths::ConvertRelativePathToFull(Plugin->GetBaseDir() / TEXT("Build/PackageAndroidQuest.ps1"));
+	const FString ProjectPath = FPaths::ConvertRelativePathToFull(FPaths::GetProjectFilePath());
+	const FString EnginePath = FPaths::ConvertRelativePathToFull(FPaths::EngineDir() / TEXT(".."));
+	const FString Arguments = FString::Printf(
+		TEXT("-NoProfile -ExecutionPolicy Bypass -File \"%s\" -Project \"%s\" -Engine \"%s\""),
+		*ScriptPath, *ProjectPath, *EnginePath);
+
+	FProcHandle ProcessHandle = FPlatformProcess::CreateProc(TEXT("powershell.exe"), *Arguments, true, false, false, nullptr, 0, *FPaths::ProjectDir(), nullptr);
+	if (!ProcessHandle.IsValid())
+	{
+		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("AndroidQuestLaunchFailed", "Failed to start the Android/Quest packaging process."));
+	}
+}
+
 void FUnrealSharpEditorModule::OnMergeManagedSlnAndNativeSln()
 {
 	static FString NativeSolutionPath = FPaths::ProjectDir() / FApp::GetProjectName() + ".sln";
@@ -568,6 +591,9 @@ void FUnrealSharpEditorModule::AppendPackageMenu(const FCSEditorCommands& CSComm
 	MenuBuilder.AddMenuEntry(CSCommands.PackageProject, NAME_None, TAttribute<FText>(), TAttribute<FText>(),
 							 FSlateIcon(FAppStyle::Get().GetStyleSetName(), "LevelEditor.Recompile"));
 
+	MenuBuilder.AddMenuEntry(CSCommands.PackageAndroidQuest, NAME_None, TAttribute<FText>(), TAttribute<FText>(),
+							 FSlateIcon(FAppStyle::Get().GetStyleSetName(), "Icons.Package"));
+
 	MenuBuilder.EndSection();
 }
 
@@ -652,6 +678,7 @@ void FUnrealSharpEditorModule::RegisterCommands()
 		UnrealSharpCommands->MapAction(EditorCommands.OpenSolution, FExecuteAction::CreateRaw(this, &FUnrealSharpEditorModule::OnOpenSolution));
 		UnrealSharpCommands->MapAction(EditorCommands.MergeManagedSlnAndNativeSln, FExecuteAction::CreateStatic(&FUnrealSharpEditorModule::OnMergeManagedSlnAndNativeSln));
 		UnrealSharpCommands->MapAction(EditorCommands.PackageProject, FExecuteAction::CreateStatic(&FUnrealSharpEditorModule::OnPackageProject));
+		UnrealSharpCommands->MapAction(EditorCommands.PackageAndroidQuest, FExecuteAction::CreateStatic(&FUnrealSharpEditorModule::OnPackageAndroidQuest));
 	}
 
 	const FLevelEditorModule& LevelEditorModule = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");

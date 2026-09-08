@@ -1,5 +1,6 @@
 <Project>
   <PropertyGroup Condition="'$(BuildingAOT)' == 'true' and '$(TargetPlatform)' == 'Android'">
+    <UnrealSharpNativeAotEntryPoint Condition="'$(UnrealSharpNativeAotEntryPoint)' == '' and $([System.String]::Copy('$(MSBuildProjectName)').StartsWith('Managed'))">true</UnrealSharpNativeAotEntryPoint>
     <TargetFramework>net11.0-android</TargetFramework>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">android-arm64</RuntimeIdentifier>
     <OutputType>Exe</OutputType>

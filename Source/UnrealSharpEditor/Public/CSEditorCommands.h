@@ -16,6 +16,7 @@ public:
 	TSharedPtr<FUICommandInfo> OpenSolution;
 	TSharedPtr<FUICommandInfo> MergeManagedSlnAndNativeSln;
 	TSharedPtr<FUICommandInfo> PackageProject;
+	TSharedPtr<FUICommandInfo> PackageAndroidQuest;
 	TSharedPtr<FUICommandInfo> OpenSettings;
 	TSharedPtr<FUICommandInfo> OpenDocumentation;
 	TSharedPtr<FUICommandInfo> ReportBug;

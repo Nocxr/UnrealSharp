@@ -79,6 +79,7 @@ private:
     void OpenSolution();
     
     static void OnPackageProject();
+    static void OnPackageAndroidQuest();
     static void OnMergeManagedSlnAndNativeSln();
 
     static void OnOpenSettings();
