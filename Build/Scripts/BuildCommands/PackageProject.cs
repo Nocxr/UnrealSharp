@@ -244,6 +244,7 @@ public class PackageProject : BuildCommand
             string? ProjectDirectory = NativeAotEntryProject.DirectoryName;
             if (ProjectDirectory != null)
             {
+                BuildCommands.BuildSolution.RunRestore(NativeAotEntryProject.FullName, BuildUserSolutionArguments);
                 BuildCommands.BuildSolution.RunBuild(ProjectDirectory, buildConfig, publish: true, BuildUserSolutionArguments);
             }
         }

@@ -58,6 +58,32 @@ public class BuildSolution : BuildCommand
         }
     }
 
+    public static void RunRestore(string projectFile, IList<string>? extraArguments = null)
+    {
+        if (!File.Exists(projectFile))
+        {
+            throw new FileNotFoundException("Project file to restore was not found.", projectFile);
+        }
+
+        LoggerUtilities.LogUnrealSharpInfo($"Running dotnet restore on {projectFile}.");
+
+        using DotnetProcess RestoreProcess = new DotnetProcess();
+        RestoreProcess.StartInfo.WorkingDirectory = Path.GetDirectoryName(projectFile)!;
+        RestoreProcess.StartInfo.ArgumentList.Add("restore");
+        RestoreProcess.StartInfo.ArgumentList.Add(projectFile);
+        RestoreProcess.StartInfo.ArgumentList.Add("--disable-build-servers");
+
+        if (extraArguments != null)
+        {
+            foreach (string ExtraArgument in extraArguments)
+            {
+                RestoreProcess.StartInfo.ArgumentList.Add(ExtraArgument);
+            }
+        }
+
+        RestoreProcess.StartProcess();
+    }
+
     private static void ValidateSolutionFolders(List<string> folders)
     {
         foreach (string SolutionFolder in folders)
