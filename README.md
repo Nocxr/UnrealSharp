@@ -26,7 +26,7 @@ UnrealSharp is a free, open-source plugin for writing Unreal Engine 5 games in C
 
 The `quest-android-nativeaot` branch contains an experimental, end-to-end path for running UnrealSharp-managed game code on Meta Quest with .NET 11 Android ARM64 NativeAOT. Android remains listed as planned above; this branch documents a tested prototype rather than a supported production release.
 
-Unreal continues to own the Android application, content cook, APK, and OBB. The managed game and its UnrealSharp runtime dependencies are compiled into a native shared library that Unreal includes in its package:
+Unreal continues to own the Android application, content cook, and APK. The managed game and its UnrealSharp runtime dependencies are compiled into a native shared library that Unreal includes in its package:
 
 ```text
 C# game code
@@ -34,7 +34,7 @@ C# game code
   -> .NET 11 Android ARM64 NativeAOT
   -> libUnrealSharpNativeAot.so
   -> Unreal BuildCookRun
-  -> Quest APK and OBB
+  -> self-contained Quest APK
 ```
 
 ### What this branch adds
@@ -102,7 +102,7 @@ The normal workflow is **UnrealSharp > Package > Package for Android/Quest** in 
 2. Publish the managed game and UnrealSharp runtime graph with .NET 11 Android ARM64 NativeAOT.
 3. Run Unreal's Android ASTC build, cook, stage, and package pipeline.
 
-The process stops on the first failed stage and leaves the console open so its result can be inspected. Save all Blueprints and maps before running it.
+The process stops on the first failed stage and leaves the console open so its result can be inspected. It also writes `Saved/Logs/UnrealSharp-AndroidQuest-Package.log`. Save all Blueprints and maps before running it. The Quest command embeds cooked game data in the APK so installation does not depend on a separate OBB transfer utility.
 
 The commands below are the manual equivalent for diagnostics or automation. Close Unreal Editor before using them directly. Set the local paths for the project, engine, Android SDK, NDK, and JDK:
 
@@ -175,10 +175,11 @@ Then let Unreal build, cook, stage, and package the Android application:
   -package `
   -compressed `
   -cookflavor=ASTC `
+  '-ini:Engine:[/Script/AndroidRuntimeSettings.AndroidRuntimeSettings]:bPackageDataInsideApk=True' `
   -utf8output
 ```
 
-Install the generated APK and OBB using Unreal's generated install script:
+Install the generated self-contained APK using Unreal's generated install script:
 
 ```powershell
 Set-Location "$Project\Binaries\Android"

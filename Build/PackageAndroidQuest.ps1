@@ -82,6 +82,7 @@ Invoke-UAT @(
     '-package',
     '-compressed',
     '-cookflavor=ASTC',
+    '-ini:Engine:[/Script/AndroidRuntimeSettings.AndroidRuntimeSettings]:bPackageDataInsideApk=True',
     '-utf8output'
 )
 
