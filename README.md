@@ -22,6 +22,154 @@ UnrealSharp is a free, open-source plugin for writing Unreal Engine 5 games in C
 | iOS      | Planned  |
 | Android  | Planned  |
 
+## Experimental Android NativeAOT branch
+
+The `quest-android-nativeaot` branch contains an experimental, end-to-end path for running UnrealSharp-managed game code on Meta Quest with .NET 11 Android ARM64 NativeAOT. Android remains listed as planned above; this branch documents a tested prototype rather than a supported production release.
+
+Unreal continues to own the Android application, content cook, APK, and OBB. The managed game and its UnrealSharp runtime dependencies are compiled into a native shared library that Unreal includes in its package:
+
+```text
+C# game code
+  -> UnrealSharp generated bindings and registration
+  -> .NET 11 Android ARM64 NativeAOT
+  -> libUnrealSharpNativeAot.so
+  -> Unreal BuildCookRun
+  -> Quest APK and OBB
+```
+
+### What this branch adds
+
+- A `.NET 11` Android NativeAOT configuration for `android-arm64`.
+- NativeAOT bootstrap entry points and statically linked managed-assembly activation.
+- Static registration and trimming roots for generated managed Unreal types.
+- Android UPL staging for `libUnrealSharpNativeAot.so`.
+- Runtime-source project references for AOT builds while preserving the existing hosted .NET editor workflow.
+- `UETargetType=Game` binding generation for packaged builds, excluding editor-only reflected members.
+- Build automation for selecting the preview .NET SDK, publishing the managed entry project, and copying its native library into Unreal's package inputs.
+- Process-environment cleanup for reliable command-line .NET and MSBuild invocation from Unreal AutomationTool.
+
+No Unreal Engine source modifications are required. The integration is contained in this plugin branch and a small set of game-project changes.
+
+### Tested configuration
+
+- Unreal Engine 5.8
+- Windows host
+- Meta Quest, ARM64
+- Android NDK `27.2.12479018`
+- .NET SDK `11.0.100-preview.7.26381.103`
+- `Microsoft.NETCore.App` and NativeAOT packs `11.0.0-preview.7.26381.103`
+
+These versions reflect the tested environment and are currently pinned by the prototype. Other .NET 11 previews or stable releases may require updating the versions in `UnrealSharp.AOT.props` and the packaging arguments together.
+
+### Game-project integration
+
+Enable the UnrealSharp plugin in the `.uproject` and add `UnrealSharpCore` as a private dependency of the game's Unreal module:
+
+```csharp
+PrivateDependencyModuleNames.Add("UnrealSharpCore");
+```
+
+The game module must ensure that UnrealSharp starts in the Android process:
+
+```cpp
+#include "Modules/ModuleManager.h"
+
+class FMyGameModule final : public FDefaultGameModuleImpl
+{
+public:
+    virtual void StartupModule() override
+    {
+        FDefaultGameModuleImpl::StartupModule();
+
+#if PLATFORM_ANDROID
+        FModuleManager::LoadModuleChecked<IModuleInterface>(TEXT("UnrealSharpCore"));
+#endif
+    }
+};
+
+IMPLEMENT_PRIMARY_GAME_MODULE(FMyGameModule, MyGame, "MyGame");
+```
+
+Mark the managed runtime project that begins with `Managed` as the NativeAOT entry point:
+
+```xml
+<PropertyGroup>
+  <UnrealSharpNativeAotEntryPoint>true</UnrealSharpNativeAotEntryPoint>
+</PropertyGroup>
+```
+
+Compile and save managed-derived Blueprints and save their maps before cooking. Blueprint assets saved against an older managed class layout may otherwise retain stale component-template references.
+
+### Packaging
+
+Close Unreal Editor before command-line packaging. Set the local paths for the project, engine, Android SDK, NDK, and JDK:
+
+```powershell
+$Project = "H:\projects\unreal\MyGame"
+$Engine  = "H:\unreal\UE_5.8"
+
+$env:ANDROID_HOME = "C:\Android\sdk"
+$env:ANDROID_SDK_ROOT = $env:ANDROID_HOME
+$env:NDKROOT = "C:\Android\sdk\ndk\27.2.12479018"
+$env:NDK_ROOT = $env:NDKROOT
+$env:JAVA_HOME = "C:\Android\jdk-21.0.3"
+```
+
+First publish the managed game and UnrealSharp runtime graph as Android ARM64 NativeAOT. Replace `MyGame.uproject` with the actual project filename:
+
+```powershell
+& "$Engine\Engine\Build\BatchFiles\RunUAT.bat" `
+  "-ScriptsForProject=$Project\MyGame.uproject" `
+  PackageProject `
+  "-Project=$Project\MyGame.uproject" `
+  "-ArchiveDirectory=$Project" `
+  -UETargetType=Game `
+  -UEBuildConfig=Development `
+  -TargetPlatform=Android `
+  -TargetArchitecture=arm64 `
+  -NativeAOT `
+  "-UserParams=-p:MicrosoftNETCoreAppRefPackageVersion=11.0.0-preview.7.26381.103" `
+  "-UserParams=-p:MicrosoftNETCoreAppRuntimePackageVersion=11.0.0-preview.7.26381.103" `
+  "-UserParams=-p:MicrosoftDotNetILCompilerPackageVersion=11.0.0-preview.7.26381.103"
+```
+
+The expected native output is:
+
+```text
+Binaries/Managed/net11.0-android/native/arm64-v8a/libUnrealSharpNativeAot.so
+```
+
+Then let Unreal build, cook, stage, and package the Android application:
+
+```powershell
+& "$Engine\Engine\Build\BatchFiles\RunUAT.bat" `
+  "-ScriptsForProject=$Project\MyGame.uproject" `
+  BuildCookRun `
+  "-Project=$Project\MyGame.uproject" `
+  -noP4 `
+  -platform=Android `
+  -clientconfig=Development `
+  -build `
+  -cook `
+  -stage `
+  -pak `
+  -package `
+  -compressed `
+  -cookflavor=ASTC `
+  -utf8output
+```
+
+Install the generated APK and OBB using Unreal's generated install script:
+
+```powershell
+Set-Location "$Project\Binaries\Android"
+.\Install_MyGame-arm64.bat
+```
+
+The first NativeAOT publish can take several minutes because it compiles the UnrealSharp runtime binding graph. Subsequent builds can reuse unchanged outputs. If Unreal reports that the APK is current after the NativeAOT library changes, force regeneration of the generated APK before running `BuildCookRun` again.
+
+Successful device startup includes log messages for loading `libUnrealSharpNativeAot.so`, initializing the Android NativeAOT callbacks, and activating the statically linked managed game assembly.
+
 ## Prerequisites
 
 - Unreal Engine 5.6 - 5.8
