@@ -159,7 +159,7 @@ void FUnrealSharpEditorModule::OnPackageAndroidQuest()
 		*PowerShellPath, *ScriptPath, *ProjectPath, *EnginePath);
 
 	UE_LOGFMT(LogUnrealSharpEditor, Display, "Launching Android/Quest packaging in a new PowerShell window. Script: {0}", ScriptPath);
-	FProcHandle ProcessHandle = FPlatformProcess::CreateProc(*CmdPath, *Arguments, true, true, true, nullptr, 0, *FPaths::ProjectDir(), nullptr);
+	FProcHandle ProcessHandle = FPlatformProcess::CreateProc(*CmdPath, *Arguments, false, false, false, nullptr, 0, *FPaths::ProjectDir(), nullptr);
 	if (!ProcessHandle.IsValid())
 	{
 		UE_LOGFMT(LogUnrealSharpEditor, Error, "Failed to launch Android/Quest packaging through: {0}", CmdPath);
