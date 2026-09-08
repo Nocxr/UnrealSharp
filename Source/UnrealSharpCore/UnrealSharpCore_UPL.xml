@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root xmlns:android="http://schemas.android.com/apk/res/android">
+  <init>
+    <setBool result="bSupported" value="false" />
+    <isArch arch="arm64-v8a">
+      <setBool result="bSupported" value="true" />
+    </isArch>
+  </init>
+  <resourceCopies>
+    <if condition="bSupported">
+      <true>
+        <copyFile
+          src="$S(AbsProjectDir)/Binaries/Managed/net11.0-android/native/arm64-v8a/libUnrealSharpNativeAot.so"
+          dst="$S(BuildDir)/libs/arm64-v8a/libUnrealSharpNativeAot.so" />
+      </true>
+    </if>
+  </resourceCopies>
+</root>

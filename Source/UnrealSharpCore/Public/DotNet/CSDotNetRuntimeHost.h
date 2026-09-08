@@ -2,8 +2,10 @@
 
 #include "CoreMinimal.h"
 
+#if !UNREALSHARP_NATIVE_AOT
 #include <coreclr_delegates.h>
 #include <hostfxr.h>
+#endif
 
 #include "HAL/PlatformProcess.h"
 
@@ -12,8 +14,14 @@ struct FCSManagedPluginCallbacks;
 
 struct FCSInitializationResult
 {
+#if UNREALSHARP_NATIVE_AOT
+	static constexpr int32 MessageCapacity = 4096;
+	uint8 bSuccess = 0;
+	UTF8CHAR Message[MessageCapacity] = {};
+#else
 	bool bSuccess = false;
 	const TCHAR* Message = nullptr;
+#endif
 };
 
 using FInitializeUnrealSharp = void (*)(const UTF8CHAR*, FCSManagedPluginCallbacks*, const void*, FCSManagedCallbacks*, FCSInitializationResult*);
@@ -42,6 +50,7 @@ public:
 	void ShutdownManagedRuntime();
 
 private:
+#if !UNREALSHARP_NATIVE_AOT
 	static FCSDotNetLayout ResolveDotNetLayout(const FString& PluginAssemblyPath);
 
 	load_assembly_and_get_function_pointer_fn InitializeHost();
@@ -58,6 +67,7 @@ private:
 	hostfxr_initialize_for_runtime_config_fn Hostfxr_InitForRuntimeConfig = nullptr;
 	hostfxr_get_runtime_delegate_fn Hostfxr_GetRuntimeDelegate = nullptr;
 	hostfxr_close_fn Hostfxr_Close = nullptr;
+#endif
 
 	void* RuntimeHost = nullptr;
 };

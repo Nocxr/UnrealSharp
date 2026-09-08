@@ -1,0 +1,7 @@
+<Project TreatAsLocalProperty="PublishAot;RuntimeIdentifier;BuildingAOT;TargetFramework;TargetPlatform">
+  <PropertyGroup>
+    <PublishAot>false</PublishAot>
+    <BuildingAOT>false</BuildingAOT>
+    <RuntimeIdentifier></RuntimeIdentifier>
+  </PropertyGroup>
+</Project>

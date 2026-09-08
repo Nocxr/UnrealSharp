@@ -188,23 +188,67 @@ public class NativeCallbacksWrapperGenerator : IIncrementalGenerator
             sourceBuilder.AppendLine("        {");
 
             string delegateName = delegateInfo.Name;
+			List<DelegateParameterInfo> stringParameters = delegateInfo.Parameters.Where(p => p.IsString).ToList();
+			foreach (DelegateParameterInfo parameter in stringParameters)
+			{
+				sourceBuilder.AppendLine($"            IntPtr {parameter.Name}Utf8 = {parameter.Name} == null ? IntPtr.Zero : System.Runtime.InteropServices.Marshal.StringToCoTaskMemUTF8({parameter.Name});");
+			}
+
+			if (stringParameters.Count > 0)
+			{
+				sourceBuilder.AppendLine("            try");
+				sourceBuilder.AppendLine("            {");
+			}
 
             if (delegateInfo.ReturnValue.Type.ToString() != "void")
             {
-                sourceBuilder.Append($"            return {delegateName}(");
+				sourceBuilder.Append(stringParameters.Count > 0 ? "                return " : "            return ");
             }
             else
             {
-                sourceBuilder.Append($"            {delegateName}(");
+				sourceBuilder.Append(stringParameters.Count > 0 ? "                " : "            ");
             }
+
+			if (stringParameters.Count > 0)
+			{
+				sourceBuilder.Append("((delegate* unmanaged<");
+				sourceBuilder.Append(string.Join(", ", delegateInfo.Parameters.Select(p =>
+				{
+					string prefix = p.IsOutParameter ? "out " : p.IsRefParameter ? "ref " : string.Empty;
+					string typeName = p.IsString ? "byte*" : (p.Type.GetAnnotatedTypeName(model) ?? p.Type.ToString());
+					return prefix + typeName;
+				})));
+				if (delegateInfo.Parameters.Count > 0)
+				{
+					sourceBuilder.Append(", ");
+				}
+				sourceBuilder.Append(returnTypeFullName);
+				sourceBuilder.Append($">){delegateName})(");
+			}
+			else
+			{
+				sourceBuilder.Append($"{delegateName}(");
+			}
 
             sourceBuilder.Append(string.Join(", ", delegateInfo.Parameters.Select(p =>
             {
                 string prefix = p.IsOutParameter ? "out " : p.IsRefParameter ? "ref " : string.Empty;
-                return prefix + p.Name;
+				return prefix + (p.IsString ? $"(byte*){p.Name}Utf8" : p.Name);
             })));
 
             sourceBuilder.AppendLine(");");
+
+			if (stringParameters.Count > 0)
+			{
+				sourceBuilder.AppendLine("            }");
+				sourceBuilder.AppendLine("            finally");
+				sourceBuilder.AppendLine("            {");
+				foreach (DelegateParameterInfo parameter in stringParameters)
+				{
+					sourceBuilder.AppendLine($"                if ({parameter.Name}Utf8 != IntPtr.Zero) System.Runtime.InteropServices.Marshal.FreeCoTaskMem({parameter.Name}Utf8);");
+				}
+				sourceBuilder.AppendLine("            }");
+			}
             sourceBuilder.AppendLine("        }");
         }
 
@@ -273,6 +317,7 @@ public class NativeCallbacksWrapperGenerator : IIncrementalGenerator
                     Name = paramName.ToString(),
                     IsOutParameter = param.Modifiers.Any(modifier => modifier.IsKind(SyntaxKind.OutKeyword)),
                     IsRefParameter = param.Modifiers.Any(modifier => modifier.IsKind(SyntaxKind.RefKeyword)),
+					IsString = context.SemanticModel.GetTypeInfo(param.Type).Type?.SpecialType == SpecialType.System_String,
                     Type = param.Type,
                 };
 
@@ -334,4 +379,5 @@ public struct DelegateParameterInfo
     public TypeSyntax Type;
     public bool IsOutParameter;
     public bool IsRefParameter;
+	public bool IsString;
 }

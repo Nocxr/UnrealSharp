@@ -79,10 +79,12 @@ public class BuildSolution : BuildCommand
         LoggerUtilities.LogUnrealSharpInfo($"Running dotnet {action} on {solutionFolder} (configuration: {configurationName}).");
 
         using DotnetProcess BuildSolutionProcess = new DotnetProcess();
+        BuildSolutionProcess.StartInfo.WorkingDirectory = solutionFolder;
         BuildSolutionProcess.StartInfo.ArgumentList.Add(action);
         BuildSolutionProcess.StartInfo.ArgumentList.Add(solutionFolder);
         BuildSolutionProcess.StartInfo.ArgumentList.Add("--configuration");
         BuildSolutionProcess.StartInfo.ArgumentList.Add(configurationName);
+        BuildSolutionProcess.StartInfo.ArgumentList.Add("--disable-build-servers");
 
         if (extraArguments != null)
         {

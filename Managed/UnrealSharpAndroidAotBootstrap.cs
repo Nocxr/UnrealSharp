@@ -1,10 +1,12 @@
+#if ANDROID && NATIVE_AOT
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using UnrealSharp.Binds;
 using UnrealSharp.Core;
+using UnrealSharp.Plugins;
 
-namespace UnrealSharp.Plugins;
+namespace UnrealSharp.NativeAotBootstrap;
 
 [StructLayout(LayoutKind.Sequential)]
 internal unsafe struct FCSInitializationResult
@@ -14,7 +16,7 @@ internal unsafe struct FCSInitializationResult
     public fixed byte Message[MessageCapacity];
 }
 
-internal static class Main
+internal static class UnrealSharpAndroidAotBootstrap
 {
     [UnmanagedCallersOnly(EntryPoint = "InitializeUnrealSharp")]
     private static unsafe void InitializeUnrealSharp(
@@ -28,10 +30,6 @@ internal static class Main
         {
             AppDomain.CurrentDomain.SetData("APP_CONTEXT_BASE_DIRECTORY",
                 Marshal.PtrToStringUTF8((nint)workingDirectoryUtf8)!);
-
-#if WITH_EDITOR
-            TryRegisterMSBuild();
-#endif
 
             PluginsCallbacks.Initialize(pluginCallbacks);
             ManagedCallbacks.Initialize(managedCallbacks);
@@ -52,24 +50,5 @@ internal static class Main
         Marshal.Copy(bytes, 0, buffer, length);
         Marshal.WriteByte(buffer, length, 0);
     }
-
-#if WITH_EDITOR
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void TryRegisterMSBuild()
-    {
-        var instance = Microsoft.Build.Locator.MSBuildLocator
-            .QueryVisualStudioInstances()
-            .OrderByDescending(i => i.Version)
-            .FirstOrDefault();
-
-        if (instance != null)
-        {
-            Microsoft.Build.Locator.MSBuildLocator.RegisterInstance(instance);
-        }
-        else
-        {
-            Microsoft.Build.Locator.MSBuildLocator.RegisterDefaults();
-        }
-    }
-#endif
 }
+#endif

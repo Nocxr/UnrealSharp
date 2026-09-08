@@ -52,7 +52,8 @@
 	],
 	"SupportedTargetPlatforms": [
 		"Win64",
-		"Mac"
+		"Mac",
+		"Android"
 	],
 	"Plugins": [
 		{
@@ -70,3 +71,4 @@
 	],
 	"SupportURL": "https://discord.gg/QHb8VjNptE"
 }
+

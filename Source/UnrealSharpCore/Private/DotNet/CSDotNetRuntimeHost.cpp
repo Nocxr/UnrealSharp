@@ -11,7 +11,9 @@
 
 using namespace UnrealSharp;
 
+#if !UNREALSHARP_NATIVE_AOT
 static_assert(sizeof(DotNetUtilities::FHostChar) == sizeof(char_t), "FHostChar does not match hostfxr's char_t.");
+#endif
 
 FCSDotNetRuntimeHost::~FCSDotNetRuntimeHost()
 {
@@ -20,6 +22,25 @@ FCSDotNetRuntimeHost::~FCSDotNetRuntimeHost()
 
 bool FCSDotNetRuntimeHost::InitializeManagedRuntime()
 {
+	FInitializeUnrealSharp InitializeUnrealSharp = nullptr;
+	const FString UserWorkingDirectory = FPaths::ConvertRelativePathToFull(Paths::GetUserAssemblyDirectory());
+
+#if UNREALSHARP_NATIVE_AOT
+	const FString NativeAotLibrary = TEXT("libUnrealSharpNativeAot.so");
+	RuntimeHost = FPlatformProcess::GetDllHandle(*NativeAotLibrary);
+	if (!RuntimeHost)
+	{
+		UE_LOGFMT(LogUnrealSharp, Fatal, "Failed to load Android NativeAOT library '{0}'.", NativeAotLibrary);
+	}
+
+	InitializeUnrealSharp = reinterpret_cast<FInitializeUnrealSharp>(
+		FPlatformProcess::GetDllExport(RuntimeHost, TEXT("InitializeUnrealSharp")));
+	if (!InitializeUnrealSharp)
+	{
+		UE_LOGFMT(LogUnrealSharp, Fatal, "NativeAOT library '{0}' does not export InitializeUnrealSharp.", NativeAotLibrary);
+	}
+	UE_LOGFMT(LogUnrealSharp, Display, "Loaded Android NativeAOT library '{0}'.", NativeAotLibrary);
+#else
 	load_assembly_and_get_function_pointer_fn LoadAssemblyAndGetFunctionPointer = InitializeHost();
 	if (!LoadAssemblyAndGetFunctionPointer)
 	{
@@ -29,13 +50,10 @@ bool FCSDotNetRuntimeHost::InitializeManagedRuntime()
 	const FString EntryPointClassName = TEXT("UnrealSharp.Plugins.Main, UnrealSharp.Plugins");
 	const FString EntryPointFunctionName = TEXT("InitializeUnrealSharp");
 	const FString UnrealSharpLibraryAssembly = FPaths::ConvertRelativePathToFull(Paths::GetUnrealSharpPluginsPath());
-	const FString UserWorkingDirectory = FPaths::ConvertRelativePathToFull(Paths::GetUserAssemblyDirectory());
-
 	DotNetUtilities::FHostStringConversion AssemblyPathConv = StringCast<DotNetUtilities::FHostChar>(*UnrealSharpLibraryAssembly);
 	DotNetUtilities::FHostStringConversion EntryPointClassConv = StringCast<DotNetUtilities::FHostChar>(*EntryPointClassName);
 	DotNetUtilities::FHostStringConversion EntryPointFunctionConv = StringCast<DotNetUtilities::FHostChar>(*EntryPointFunctionName);
 
-	FInitializeUnrealSharp InitializeUnrealSharp = nullptr;
 	const int32 ErrorCode = LoadAssemblyAndGetFunctionPointer(
 		reinterpret_cast<const char_t*>(AssemblyPathConv.Get()),
 		reinterpret_cast<const char_t*>(EntryPointClassConv.Get()),
@@ -48,6 +66,7 @@ bool FCSDotNetRuntimeHost::InitializeManagedRuntime()
 	{
 		UE_LOGFMT(LogUnrealSharp, Fatal, "Failed to load assembly '{0}'. hostfxr error code: {1}", UnrealSharpLibraryAssembly, ErrorCode);
 	}
+#endif
 
 	const FTCHARToUTF8 WorkingDirectoryUtf8(*UserWorkingDirectory);
 
@@ -62,8 +81,17 @@ bool FCSDotNetRuntimeHost::InitializeManagedRuntime()
 
 	if (!InitializationResult.bSuccess)
 	{
+#if UNREALSHARP_NATIVE_AOT
+		const FString InitializationMessage = UTF8_TO_TCHAR(InitializationResult.Message);
+		UE_LOGFMT(LogUnrealSharp, Fatal, "Failed to initialize UnrealSharp! Exception:\n{0}", InitializationMessage);
+#else
 		UE_LOGFMT(LogUnrealSharp, Fatal, "Failed to initialize UnrealSharp! Exception:\n{0}", InitializationResult.Message);
+#endif
 	}
+
+#if UNREALSHARP_NATIVE_AOT
+	UE_LOGFMT(LogUnrealSharp, Display, "Initialized UnrealSharp Android NativeAOT callbacks.");
+#endif
 
 #if !(UE_BUILD_SHIPPING)
 	if (FParse::Param(FCommandLine::Get(), TEXT("-waitformanageddebugger")))
@@ -83,12 +111,15 @@ void FCSDotNetRuntimeHost::ShutdownManagedRuntime()
 		RuntimeHost = nullptr;
 	}
 
+#if !UNREALSHARP_NATIVE_AOT
 	Hostfxr_InitForCommandLine = nullptr;
 	Hostfxr_InitForRuntimeConfig = nullptr;
 	Hostfxr_GetRuntimeDelegate = nullptr;
 	Hostfxr_Close = nullptr;
+#endif
 }
 
+#if !UNREALSHARP_NATIVE_AOT
 FCSDotNetLayout FCSDotNetRuntimeHost::ResolveDotNetLayout(const FString& PluginAssemblyPath)
 {
 	const FString RuntimeDirectory = FPaths::GetPath(PluginAssemblyPath);
@@ -235,3 +266,4 @@ load_assembly_and_get_function_pointer_fn FCSDotNetRuntimeHost::ConfigureRuntime
 
 	return reinterpret_cast<load_assembly_and_get_function_pointer_fn>(LoadAssemblyAndGetFunctionPointer);
 }
+#endif

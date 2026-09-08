@@ -43,11 +43,13 @@ bool UCSManagedAssembly::LoadAssembly()
 		return true;
 	}
 
+#if !UNREALSHARP_NATIVE_AOT
 	if (!FPaths::FileExists(AssemblyFilePath))
 	{
 		UE_LOGFMT(LogUnrealSharp, Error, "Assembly path does not exist: {0}", AssemblyFilePath);
 		return false;
 	}
+#endif
 
 	bIsLoading = true;
 

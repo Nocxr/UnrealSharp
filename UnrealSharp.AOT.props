@@ -1,5 +1,31 @@
 <Project>
-  <PropertyGroup>
-
+  <PropertyGroup Condition="'$(BuildingAOT)' == 'true' and '$(TargetPlatform)' == 'Android'">
+    <TargetFramework>net11.0-android</TargetFramework>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">android-arm64</RuntimeIdentifier>
+    <OutputType>Exe</OutputType>
+    <SupportedOSPlatformVersion>24.0</SupportedOSPlatformVersion>
+    <ApplicationId Condition="'$(ApplicationId)' == ''">com.unrealsharp.$([System.String]::Copy('$(MSBuildProjectName)').ToLowerInvariant().Replace('_', ''))</ApplicationId>
+    <ApplicationVersion Condition="'$(ApplicationVersion)' == ''">1</ApplicationVersion>
+    <ApplicationDisplayVersion Condition="'$(ApplicationDisplayVersion)' == ''">1.0</ApplicationDisplayVersion>
+    <PublishAot>true</PublishAot>
+    <SelfContained>true</SelfContained>
+    <PublishSelfContained>true</PublishSelfContained>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>full</TrimMode>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <IlcGenerateCompleteTypeMetadata>true</IlcGenerateCompleteTypeMetadata>
+    <EnablePreviewFeatures>true</EnablePreviewFeatures>
+    <AndroidSdkDirectory Condition="'$(AndroidSdkDirectory)' == '' and Exists('C:\Android\sdk')">C:\Android\sdk</AndroidSdkDirectory>
+    <AndroidNdkDirectory Condition="'$(AndroidNdkDirectory)' == '' and Exists('C:\Android\sdk\ndk\27.2.12479018')">C:\Android\sdk\ndk\27.2.12479018</AndroidNdkDirectory>
+    <MicrosoftNETCoreAppRefPackageVersion Condition="'$(MicrosoftNETCoreAppRefPackageVersion)' == ''">11.0.0-preview.7.26381.103</MicrosoftNETCoreAppRefPackageVersion>
+    <MicrosoftNETCoreAppRuntimePackageVersion Condition="'$(MicrosoftNETCoreAppRuntimePackageVersion)' == ''">11.0.0-preview.7.26381.103</MicrosoftNETCoreAppRuntimePackageVersion>
+    <MicrosoftDotNetILCompilerPackageVersion Condition="'$(MicrosoftDotNetILCompilerPackageVersion)' == ''">11.0.0-preview.7.26381.103</MicrosoftDotNetILCompilerPackageVersion>
   </PropertyGroup>
+  <ItemGroup Condition="'$(BuildingAOT)' == 'true' and '$(TargetPlatform)' == 'Android' and '$(UnrealSharpNativeAotEntryPoint)' == 'true'">
+    <Compile Include="$(UnrealSharpPluginDir)Managed\UnrealSharpAndroidAotActivity.cs" Link="UnrealSharpAndroidAotActivity.cs" />
+    <Compile Include="$(UnrealSharpPluginDir)Managed\UnrealSharpAndroidAotBootstrap.cs" Link="UnrealSharpAndroidAotBootstrap.cs" />
+  </ItemGroup>
 </Project>
+
+
+

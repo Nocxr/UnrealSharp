@@ -46,16 +46,42 @@ public class PackageProject : BuildCommand
         LogOptions(options);
 
         DotNetSdkUtilities.CopyGlobalJson(this);
+        if (options.NativeAot && options.TargetPlatform == UnrealTargetPlatform.Android)
+        {
+            WriteAndroidNativeAotGlobalJson();
+        }
 
-        string PublishFolder = PathUtilities.BuildOutputPath(options.ArchiveDirectory);
+        string PublishFolder = options.NativeAot && options.TargetPlatform == UnrealTargetPlatform.Android
+            ? Path.Combine(options.ArchiveDirectory, "Binaries", "Managed", "net11.0-android")
+            : PathUtilities.BuildOutputPath(options.ArchiveDirectory);
         CleanBuildArtifacts(PublishFolder);
 
         string RuntimeIdentifier = DotNetSdkUtilities.GetDotNetRuntimeIdentifier(options.TargetPlatform, options.TargetArchitecture);
         IList<string> Arguments = BuildBaseArguments(RuntimeIdentifier, options, PublishFolder);
 
-        BuildBindingsSolution(Arguments, options.BuildConfiguration);
-        BuildUserBindings(PublishFolder, options, Arguments);
-        BuildUserSolution(PublishFolder, Arguments, options.BuildConfiguration, options.UserParams);
+        if (!options.NativeAot)
+        {
+            BuildBindingsSolution(Arguments, options.BuildConfiguration);
+            BuildUserBindings(PublishFolder, options, Arguments);
+        }
+        else
+        {
+            LoggerUtilities.LogUnrealSharpInfo("Native AOT packaging: skipping hosted UnrealSharp binding/glue publish and building user runtime projects only.");
+        }
+
+        if (options.NativeAot)
+        {
+            BuildNativeAotUserProjects(PublishFolder, Arguments, options.BuildConfiguration, options.UserParams);
+        }
+        else
+        {
+            BuildUserSolution(PublishFolder, Arguments, options.BuildConfiguration, options.UserParams);
+        }
+
+        if (options.NativeAot && options.TargetPlatform == UnrealTargetPlatform.Android)
+        {
+            CopyAndroidNativeAotLibraries(PublishFolder, options);
+        }
         
         EmitInstalledFlagFile(PublishFolder);
 
@@ -106,11 +132,6 @@ public class PackageProject : BuildCommand
             throw new DirectoryNotFoundException($"Archive directory does not exist: {options.ArchiveDirectory}");
         }
 
-        if (options.NativeAot)
-        {
-            throw new NotSupportedException("Native AOT packaging is not currently supported. This option is reserved for future use and should not be set.");
-        }
-
         string HostFxrPath = DotNetUtilities.LatestHostFxrPath;
         if (!File.Exists(HostFxrPath))
         {
@@ -123,6 +144,11 @@ public class PackageProject : BuildCommand
     private static void ValidatePlatformArchitecture(UnrealTargetPlatform platform, UnrealArch architecture)
     {
         if (platform == UnrealTargetPlatform.LinuxArm64 && architecture != UnrealArch.Arm64)
+        {
+            throw new ArgumentException($"Platform '{platform}' requires architecture '{UnrealArch.Arm64}', " + $"but '{architecture}' was specified.");
+        }
+
+        if (platform == UnrealTargetPlatform.Android && architecture != UnrealArch.Arm64)
         {
             throw new ArgumentException($"Platform '{platform}' requires architecture '{UnrealArch.Arm64}', " + $"but '{architecture}' was specified.");
         }
@@ -164,14 +190,96 @@ public class PackageProject : BuildCommand
             "--runtime", runtimeIdentifier,
 
             "-p:UseDefaultOutputPath=true",
-            
-            $"-p:PublishSelfContained={(options.NativeAot ? "false" : "true")}",
+            $"-p:TargetPlatform={options.TargetPlatform}",
+            $"-p:TargetArchitecture={options.TargetArchitecture}",
+            $"-p:BuildingAOT={options.NativeAot.ToString().ToLowerInvariant()}",
+            "-p:PublishSelfContained=true",
+            $"-p:PublishAot={options.NativeAot.ToString().ToLowerInvariant()}",
 
             $"-p:UETargetType={options.TargetType}",
             $"-p:UEBuildConfig={options.BuildConfiguration}",
 
             $"-p:PublishDir=\"{publishFolder}\"",
         ];
+    }
+
+    private void WriteAndroidNativeAotGlobalJson()
+    {
+        string GlobalJsonPath = Path.Combine(this.GetProjectScriptFolder(), "global.json");
+        File.WriteAllText(GlobalJsonPath, """
+{
+  "sdk": {
+    "version": "11.0.100-preview.7.26381.103",
+    "rollForward": "latestFeature",
+    "allowPrerelease": true
+  }
+}
+""");
+    }
+    private void BuildNativeAotUserProjects(string publishFolder, IList<string> buildArguments, UnrealTargetConfiguration buildConfig, string[]? userParams)
+    {
+        IList<string> BuildUserSolutionArguments = buildArguments;
+        if (userParams is { Length: > 0 })
+        {
+            BuildUserSolutionArguments = new List<string>(buildArguments);
+            foreach (string UserParam in userParams)
+            {
+                BuildUserSolutionArguments.Add(UserParam);
+            }
+        }
+
+        List<FileInfo> RuntimeProjectFiles = this.GetManagedProjectFiles()
+            .Where(file => !ProjectUtilities.IsEditorOnlyProject(file.FullName))
+            .ToList();
+
+        FileInfo NativeAotEntryProject = RuntimeProjectFiles
+            .FirstOrDefault(file => file.Name.StartsWith("Managed", StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException("NativeAOT packaging requires a runtime project whose name starts with 'Managed'.");
+
+        string? PreviousSdkVersion = Environment.GetEnvironmentVariable("UNREALSHARP_DOTNET_SDK_VERSION");
+        Environment.SetEnvironmentVariable("UNREALSHARP_DOTNET_SDK_VERSION", "11.0.100-preview.7.26381.103");
+
+        try
+        {
+            string? ProjectDirectory = NativeAotEntryProject.DirectoryName;
+            if (ProjectDirectory != null)
+            {
+                BuildCommands.BuildSolution.RunBuild(ProjectDirectory, buildConfig, publish: true, BuildUserSolutionArguments);
+            }
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("UNREALSHARP_DOTNET_SDK_VERSION", PreviousSdkVersion);
+        }
+
+        LoadOrderOptions Options = new LoadOrderOptions
+        {
+            Collectible = false,
+            Priority = LoadOrderUtilities.UserLoadOrderPriority
+        };
+        LoadOrderUtilities.TryEmitLoadOrder([NativeAotEntryProject.FullName], publishFolder, LoadOrderUtilities.UserLoadOrderName, Options);
+    }
+    private void CopyAndroidNativeAotLibraries(string publishFolder, PackagingOptions options)
+    {
+        string ConfigurationName = options.BuildConfiguration.GetDotNetBuildConfiguration();
+        string NativeOutputFolder = Path.Combine(publishFolder, "native", "arm64-v8a");
+        Directory.CreateDirectory(NativeOutputFolder);
+
+        FileInfo NativeAotEntryProject = this.GetManagedProjectFiles()
+            .FirstOrDefault(file => !ProjectUtilities.IsEditorOnlyProject(file.FullName)
+                && file.Name.StartsWith("Managed", StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException("NativeAOT packaging requires a runtime project whose name starts with 'Managed'.");
+
+        string SourceNativeFolder = Path.Combine(NativeAotEntryProject.DirectoryName!, "bin", ConfigurationName, "net11.0-android", "android-arm64", "native");
+        string SourceLibrary = Path.Combine(SourceNativeFolder, $"lib{Path.GetFileNameWithoutExtension(NativeAotEntryProject.Name)}.so");
+        if (!File.Exists(SourceLibrary))
+        {
+            throw new FileNotFoundException("NativeAOT entry library was not produced.", SourceLibrary);
+        }
+
+        string Destination = Path.Combine(NativeOutputFolder, "libUnrealSharpNativeAot.so");
+        File.Copy(SourceLibrary, Destination, overwrite: true);
+        LoggerUtilities.LogUnrealSharpInfo($"Copied Android NativeAOT entry library: {Destination}");
     }
 
     private void BuildBindingsSolution(IList<string> arguments, UnrealTargetConfiguration buildConfig)
@@ -269,3 +377,10 @@ public class PackageProject : BuildCommand
         File.WriteAllText(InstalledFlagFilePath, string.Empty);
     }
 }
+
+
+
+
+
+
+

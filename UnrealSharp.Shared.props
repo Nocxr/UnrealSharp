@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework Condition="'$(TargetFramework)' == ''">net10.0</TargetFramework>
+    <UnrealSharpReferenceTargetFramework Condition="'$(UnrealSharpReferenceTargetFramework)' == ''">net10.0</UnrealSharpReferenceTargetFramework>
     <SolutionDir Condition="'$(SolutionDir)' == ''">$(MSBuildThisFileDirectory)..\..\</SolutionDir>
     <UnrealSharpPluginDir>$(MSBuildThisFileDirectory)</UnrealSharpPluginDir>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -11,28 +12,32 @@
   <Import Project="$(UnrealSharpPluginDir)UnrealSharp.AOT.props" Condition="Exists('$(UnrealSharpPluginDir)UnrealSharp.AOT.props')" />
   <Import Project="$(UnrealSharpPluginDir)UnrealSharp.Build.props" Condition="Exists('$(UnrealSharpPluginDir)UnrealSharp.Build.props')" />
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(BuildingAOT)' != 'true'">
   
     <Reference Include="UnrealSharp">
-      <HintPath>$(UnrealSharpPluginDir)Binaries\Managed\$(TargetFramework)\UnrealSharp.dll</HintPath>
+      <HintPath>$(UnrealSharpPluginDir)Binaries\Managed\$(UnrealSharpReferenceTargetFramework)\UnrealSharp.dll</HintPath>
     </Reference>
 	
 	<Reference Include="UnrealSharp.Binds">
-      <HintPath>$(UnrealSharpPluginDir)Binaries\Managed\$(TargetFramework)\UnrealSharp.Binds.dll</HintPath>
+      <HintPath>$(UnrealSharpPluginDir)Binaries\Managed\$(UnrealSharpReferenceTargetFramework)\UnrealSharp.Binds.dll</HintPath>
     </Reference>
 	
     <Reference Include="UnrealSharp.Core">
-      <HintPath>$(UnrealSharpPluginDir)Binaries\Managed\$(TargetFramework)\UnrealSharp.Core.dll</HintPath>
+      <HintPath>$(UnrealSharpPluginDir)Binaries\Managed\$(UnrealSharpReferenceTargetFramework)\UnrealSharp.Core.dll</HintPath>
     </Reference>
 	
     <Reference Include="UnrealSharp.Log">
-      <HintPath>$(UnrealSharpPluginDir)Binaries\Managed\$(TargetFramework)\UnrealSharp.Log.dll</HintPath>
+      <HintPath>$(UnrealSharpPluginDir)Binaries\Managed\$(UnrealSharpReferenceTargetFramework)\UnrealSharp.Log.dll</HintPath>
     </Reference>
 
     <Reference Include="UnrealSharp.Plugins">
-      <HintPath>$(UnrealSharpPluginDir)Binaries\Managed\$(TargetFramework)\UnrealSharp.Plugins.dll</HintPath>
+      <HintPath>$(UnrealSharpPluginDir)Binaries\Managed\$(UnrealSharpReferenceTargetFramework)\UnrealSharp.Plugins.dll</HintPath>
     </Reference>
     
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(BuildingAOT)' == 'true'">
+    <ProjectReference Include="$(UnrealSharpPluginDir)Managed\UnrealSharp\UnrealSharp.Plugins\UnrealSharp.Plugins.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(SkipIncludeAnalyzers)' == ''">

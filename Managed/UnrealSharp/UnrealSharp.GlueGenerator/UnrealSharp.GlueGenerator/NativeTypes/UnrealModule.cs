@@ -25,7 +25,7 @@ public record UnrealModule : UnrealType
 		builder.AppendLine("using UnrealSharp.Engine.Core.Modules;");
 		builder.AppendLine("using UnrealSharp.Plugins;");
 		
-		builder.StartModuleInitializer($"{SourceName}ModuleRegistrar");
+		builder.StartDeferredModuleInitializer($"{SourceName}ModuleRegistrar", "Register");
 		
 		builder.AppendLine("public static void Register()");
 		builder.OpenBrace();

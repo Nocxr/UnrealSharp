@@ -67,8 +67,9 @@ public static class StringBuilderExtensions
         string jsonPropertyName = $"ReflectionMetadata_{type.SourceName}";
         string registrationMethodName = $"Register_{type.SourceName}";
 
-        builder.StartModuleInitializer(registrarClassName);
-        
+        builder.StartDeferredModuleInitializer(registrarClassName, registrationMethodName);
+
+        builder.AppendLine($"[System.Diagnostics.CodeAnalysis.DynamicDependency(System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicConstructors | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.NonPublicConstructors, typeof({type.FullName}))]");
         builder.AppendLine($"public static void {registrationMethodName}() => " + $"RegisterManagedType(\"{type.EngineName}\", {jsonPropertyName}, {(byte)type.FieldType}, typeof({type.FullName}));");
         builder.AppendLine($"static string {jsonPropertyName} => \"\"\"{stringBuilder}\"\"\";");
 
@@ -101,6 +102,20 @@ public static class StringBuilderExtensions
         builder.AppendLine("#pragma warning disable CA2255");
         builder.AppendLine("[System.Runtime.CompilerServices.ModuleInitializer]");
         builder.AppendLine("#pragma warning restore CA2255");
+    }
+
+    public static void StartDeferredModuleInitializer(this GeneratorStringBuilder builder, string initializerName, string registrationMethodName)
+    {
+        builder.AppendLine();
+        builder.AppendLine($"file static class {initializerName}");
+        builder.OpenBrace();
+        builder.AppendLine("#pragma warning disable CA2255");
+        builder.AppendLine("[System.Runtime.CompilerServices.ModuleInitializer]");
+        builder.AppendLine("#pragma warning restore CA2255");
+        builder.AppendLine("#if NATIVE_AOT");
+        builder.AppendLine($"public static void QueueRegistration() => UnrealSharp.Plugins.NativeAotRegistration.Enqueue({registrationMethodName});");
+        builder.AppendLine("#else");
+        builder.AppendLine("#endif");
     }
     
     public static void AllocateParameterBuffer(this GeneratorStringBuilder builder, string sizeName)

@@ -20,6 +20,26 @@ public static class PluginLoader
 				return (Assembly)loadedPlugin.Assembly!.Target!;
 			}
 
+            if (!RuntimeFeature.IsDynamicCodeSupported)
+            {
+                Assembly? nativeAotAssembly = AppDomain.CurrentDomain.GetAssemblies()
+                    .FirstOrDefault(assembly => assembly.GetName().Name == assemblyName.Name);
+                if (nativeAotAssembly == null)
+                {
+                    throw new InvalidOperationException($"NativeAOT assembly is not linked into the application: {assemblyName.Name}");
+                }
+
+                Plugin nativeAotPlugin = new Plugin(nativeAotAssembly);
+                Plugins.Add(assemblyName.Name!, nativeAotPlugin);
+                if (!nativeAotPlugin.LoadNativeAot())
+                {
+                    Plugins.Remove(assemblyName.Name!);
+                    throw new InvalidOperationException($"Failed to initialize NativeAOT plugin: {assemblyName.Name}");
+                }
+
+                return nativeAotAssembly;
+            }
+
 			Plugin plugin = new Plugin(assemblyName, isCollectible, assemblyPath);
 			Plugins.Add(assemblyName.Name!, plugin);
 

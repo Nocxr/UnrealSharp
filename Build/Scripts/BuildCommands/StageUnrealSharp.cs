@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using AutomationTool;
 using UnrealBuildTool;
 using UnrealSharp.Automation.Utilities;
@@ -10,6 +10,7 @@ namespace UnrealSharp.Automation.BuildCommands;
 [Help("UETargetType=<Type>", "Optional. The target type (Editor, Game, etc.). Defaults to Editor.")]
 [Help("TargetPlatform=<Platform>", "Optional. Target platform. Defaults to Win64.")]
 [Help("TargetArchitecture=<Arch>", "Optional. Target architecture. Defaults to X64.")]
+[Help("NativeAOT", "Optional flag. Enables Native AOT compilation for the user solution.")]
 public class StageUnrealSharp : BuildCommand
 {
     public override void ExecuteBuild()
@@ -22,6 +23,11 @@ public class StageUnrealSharp : BuildCommand
             new("TargetPlatform", ParseParamValue("TargetPlatform", string.Empty)),
             new("TargetArchitecture", ParseParamValue("TargetArchitecture", string.Empty))
         ];
+
+        if (ParseParam("NativeAOT"))
+        {
+            ActionArgs.Add(new("NativeAOT", "true"));
+        }
         
         CommandUtilities.RunCommand(nameof(PackageProject), this, ActionArgs);
     }

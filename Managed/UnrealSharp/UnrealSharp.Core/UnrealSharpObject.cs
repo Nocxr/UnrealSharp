@@ -19,6 +19,19 @@ public class UnrealSharpObject : IDisposable
             LogUnrealSharpCore.LogError("Failed to find default constructor for type: " + typeToCreate.FullName);
             return IntPtr.Zero;
         }
+
+        if (!RuntimeFeature.IsDynamicCodeSupported)
+        {
+            UnrealSharpObject? aotObject = foundDefaultCtor.Invoke(null) as UnrealSharpObject;
+            if (aotObject == null)
+            {
+                LogUnrealSharpCore.LogError("Failed to invoke default constructor for type: " + typeToCreate.FullName);
+                return IntPtr.Zero;
+            }
+
+            aotObject.NativeObject = nativeObjectPtr;
+            return GCHandle.ToIntPtr(GCHandleUtilities.AllocateStrongPointer(aotObject, typeToCreate.Assembly));
+        }
             
         delegate*<object, void> foundConstructor = (delegate*<object, void>) foundDefaultCtor.MethodHandle.GetFunctionPointer();
             

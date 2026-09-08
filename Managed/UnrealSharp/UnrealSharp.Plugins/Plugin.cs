@@ -43,6 +43,13 @@ public class Plugin
         }
     }
 
+    internal Plugin(Assembly assembly)
+    {
+        AssemblyName = assembly.GetName();
+        _loadContext = AssemblyLoadContext.GetLoadContext(assembly) ?? AssemblyLoadContext.Default;
+        Assembly = new WeakReference(assembly);
+    }
+
     public void AddModuleInterfaceInit(Func<IModuleInterface> initFunction)
     {
         _moduleInitFunctions.Add(initFunction);
@@ -60,6 +67,19 @@ public class Plugin
         
         RuntimeHelpers.RunModuleConstructor(assembly.ManifestModule.ModuleHandle);
         
+        StartupModule();
+        return true;
+    }
+
+    internal bool LoadNativeAot()
+    {
+        if (Assembly?.Target is not Assembly assembly)
+        {
+            return false;
+        }
+
+        AssemblyCache.AddAssembly(assembly);
+        NativeAotRegistration.RunPending();
         StartupModule();
         return true;
     }

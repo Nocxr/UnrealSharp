@@ -108,6 +108,18 @@ public static class DotNetUtilities
 	{
 		get
 		{
+			string? RequestedSdkVersion = Environment.GetEnvironmentVariable("UNREALSHARP_DOTNET_SDK_VERSION");
+			if (!string.IsNullOrEmpty(RequestedSdkVersion))
+			{
+				string RequestedSdkPath = Path.Combine(DotNetSdkDirectory, RequestedSdkVersion);
+				if (!Directory.Exists(RequestedSdkPath))
+				{
+					throw new Exception($"Requested .NET SDK version {RequestedSdkVersion} was not found in {DotNetSdkDirectory}");
+				}
+
+				return RequestedSdkPath;
+			}
+
 			if (_cachedSdkPath != null)
 			{
 				return _cachedSdkPath;

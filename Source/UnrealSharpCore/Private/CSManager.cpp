@@ -185,6 +185,11 @@ bool UCSManager::IsLoadingAnyAssembly() const
 
 void UCSManager::InitialAssemblyLoad()
 {
+#if UNREALSHARP_NATIVE_AOT
+	const FString NativeAotAssemblyName = FString::Printf(TEXT("Managed%s.dll"), FApp::GetProjectName());
+	UE_LOGFMT(LogUnrealSharp, Display, "Activating statically linked managed assembly '{0}'.", NativeAotAssemblyName);
+	LoadAssemblyByPath(FPaths::Combine(UnrealSharp::Paths::GetUserAssemblyDirectory(), NativeAotAssemblyName), false);
+#else
 	TArray<FCSLoadOrderManifest> LoadOrderManifests;
 	UnrealSharp::Project::DiscoverLoadOrderManifests(LoadOrderManifests);
 	
@@ -199,6 +204,7 @@ void UCSManager::InitialAssemblyLoad()
 			LoadAssemblyByPath(Path, Manifest.bCollectible);
 		}
 	}
+#endif
 }
 
 UCSManagedAssembly* UCSManager::LoadAssemblyByPath(const FString& AssemblyPath, bool bIsCollectible)
