@@ -46,6 +46,7 @@ C# game code
 - Runtime-source project references for AOT builds while preserving the existing hosted .NET editor workflow.
 - `UETargetType=Game` binding generation for packaged builds, excluding editor-only reflected members.
 - Build automation for selecting the preview .NET SDK, publishing the managed entry project, and copying its native library into Unreal's package inputs.
+- An explicit Android-targeted restore before NativeAOT publish so clean projects generate the required `net11.0-android/android-arm64` assets.
 - Process-environment cleanup for reliable command-line .NET and MSBuild invocation from Unreal AutomationTool.
 
 No Unreal Engine source modifications are required. The integration is contained in this plugin branch and a small set of game-project changes.
@@ -102,7 +103,9 @@ The normal workflow is **UnrealSharp > Package > Package for Android/Quest** in 
 2. Publish the managed game and UnrealSharp runtime graph with .NET 11 Android ARM64 NativeAOT.
 3. Run Unreal's Android ASTC build, cook, stage, and package pipeline.
 
-The process stops on the first failed stage and leaves the console open so its result can be inspected. It also writes `Saved/Logs/UnrealSharp-AndroidQuest-Package.log`. Save all Blueprints and maps before running it. The Quest command embeds cooked game data in the APK so installation does not depend on a separate OBB transfer utility.
+The process stops on the first failed stage and leaves the console open so its result can be inspected. It also writes `Saved/Logs/UnrealSharp-AndroidQuest-Package.log`. Save all Blueprints and maps before running it. The Quest command avoids rebuilding the open editor, works alongside an active Live Coding session, and embeds cooked game data in the APK so installation does not depend on a separate OBB transfer utility.
+
+The existing Windows packaging workflow remains unchanged. Use **UnrealSharp > Package > Package Project** followed by Unreal's normal Windows packaging command for hosted .NET Windows builds.
 
 The commands below are the manual equivalent for diagnostics or automation. Close Unreal Editor before using them directly. Set the local paths for the project, engine, Android SDK, NDK, and JDK:
 
@@ -128,6 +131,8 @@ Generate the Android Game bindings first:
   -platform=Android `
   -clientconfig=Development `
   -build `
+  -nocompileeditor `
+  '-ubtargs=-NoHotReloadFromIDE' `
   -skipcook `
   -skipstage `
   -skippackage `
@@ -169,6 +174,8 @@ Then let Unreal build, cook, stage, and package the Android application:
   -platform=Android `
   -clientconfig=Development `
   -build `
+  -nocompileeditor `
+  '-ubtargs=-NoHotReloadFromIDE' `
   -cook `
   -stage `
   -pak `
