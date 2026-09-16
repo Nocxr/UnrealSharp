@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using AutomationTool;
+using EpicGames.Core;
+using UnrealBuildBase;
 using UnrealBuildTool;
 using UnrealSharp.Automation.Utilities;
 using UnrealSharp.Shared;
@@ -51,6 +53,8 @@ public class PackageProject : BuildCommand
             WriteAndroidNativeAotGlobalJson();
         }
 
+        EnsureTargetBindings(options);
+
         string PublishFolder = options.NativeAot && options.TargetPlatform == UnrealTargetPlatform.Android
             ? Path.Combine(options.ArchiveDirectory, "Binaries", "Managed", "net11.0-android")
             : PathUtilities.BuildOutputPath(options.ArchiveDirectory);
@@ -86,6 +90,41 @@ public class PackageProject : BuildCommand
         EmitInstalledFlagFile(PublishFolder);
 
         LoggerUtilities.LogUnrealSharpInfo($"Packaging complete. Published files: {PublishFolder}");
+    }
+
+    private void EnsureTargetBindings(PackagingOptions options)
+    {
+        string BindingsDirectory = PathUtilities.GetUhtGeneratedOutputPath(this.GetUnrealSharpRootFolder(), options.TargetType);
+        string BindingsMarker = Path.Combine(BindingsDirectory, "UE5Rules.Defines.props");
+        if (File.Exists(BindingsMarker))
+        {
+            return;
+        }
+
+        FileReference ProjectFile = this.GetUProjectFile();
+        string ProjectName = ProjectFile.GetFileNameWithoutExtension();
+        string TargetName = options.TargetType switch
+        {
+            TargetType.Editor => ProjectName + "Editor",
+            TargetType.Client => ProjectName + "Client",
+            TargetType.Server => ProjectName + "Server",
+            _ => ProjectName
+        };
+
+        LoggerUtilities.LogUnrealSharpInfo($"Generated {options.TargetType} bindings were not found. Running UnrealHeaderTool for target '{TargetName}' before managed packaging...");
+        CommandUtils.RunUBT(
+            CommandUtils.CmdEnv,
+            Unreal.UnrealBuildToolDllPath,
+            ProjectFile,
+            TargetName,
+            options.TargetPlatform,
+            options.BuildConfiguration,
+            "-ForceHeaderGeneration -NoHotReloadFromIDE");
+
+        if (!File.Exists(BindingsMarker))
+        {
+            throw new FileNotFoundException($"UnrealHeaderTool completed without generating {options.TargetType} UnrealSharp bindings.", BindingsMarker);
+        }
     }
 
     private PackagingOptions ParseOptionsFromCommandLine()
@@ -129,7 +168,8 @@ public class PackageProject : BuildCommand
 
         if (!Directory.Exists(options.ArchiveDirectory))
         {
-            throw new DirectoryNotFoundException($"Archive directory does not exist: {options.ArchiveDirectory}");
+            Directory.CreateDirectory(options.ArchiveDirectory);
+            LoggerUtilities.LogUnrealSharpInfo($"Created archive directory: {options.ArchiveDirectory}");
         }
 
         string HostFxrPath = DotNetUtilities.LatestHostFxrPath;
